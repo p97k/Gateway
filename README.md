@@ -1,6 +1,6 @@
 # Production-Grade API Gateway in Go
 
-A learning-oriented but production-shaped **API Gateway** that sits between
+A production-shaped **API Gateway** that sits between
 clients and backend services and implements the core capabilities of gateways
 like Kong, Spring Cloud Gateway, APISIX and Envoy:
 
