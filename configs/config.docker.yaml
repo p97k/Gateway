@@ -1,0 +1,70 @@
+# API Gateway configuration for docker-compose. Identical to config.yaml except
+# service URLs use the compose service DNS names instead of localhost, and the
+# tracing endpoint points at the bundled OTLP collector (the Grafana Tempo or
+# OTel collector could be added; left empty here so traces are created in-process
+# without requiring a collector to be up).
+
+server:
+  port: 8080
+  read_timeout: 15s
+  write_timeout: 30s
+  idle_timeout: 60s
+  shutdown_timeout: 10s
+
+jwt:
+  algorithm: HS256
+  secret: "secret123"
+  issuer: "auth-service"
+  audience: "api"
+
+routes:
+  - prefix: /api/products
+    service: product-service
+    auth: true
+  - prefix: /api/orders
+    service: order-service
+    auth: true
+    roles: [customer, admin]
+  - prefix: /api/users
+    service: user-service
+    auth: true
+  - prefix: /api/admin
+    service: user-service
+    auth: true
+    roles: [admin]
+
+services:
+  product-service:
+    url: http://product-service:8081
+  order-service:
+    url: http://order-service:8082
+  user-service:
+    url: http://user-service:8083
+
+rate_limit:
+  global:
+    enabled: true
+    rps: 1000
+    burst: 2000
+  per_ip:
+    enabled: true
+    rps: 50
+    burst: 100
+  per_user:
+    enabled: true
+    rps: 20
+    burst: 40
+
+logging:
+  level: info
+  format: json
+
+tracing:
+  enabled: true
+  service_name: api-gateway
+  endpoint: ""
+  sampler_ratio: 1.0
+
+metrics:
+  enabled: true
+  path: /metrics

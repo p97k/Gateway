@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod *)",
+      "Bash(go get *)",
+      "Bash(go vet *)",
+      "Bash(echo \"=== vet exit: $? ===\")",
+      "Bash(go build *)",
+      "Bash(go test *)",
+      "Bash(go tool *)",
+      "Bash(awk '$3+0 < 60 {print}')",
+      "Bash(gofmt -l .)",
+      "Bash(gofmt -w cmd/mockservice/main.go internal/config/config.go internal/server/engine.go internal/server/server_test.go)",
+      "Bash(SERVICE_NAME=product-service PORT=8081 ./bin/mockservice)",
+      "Bash(SERVICE_NAME=order-service   PORT=8082 ./bin/mockservice)",
+      "Bash(SERVICE_NAME=user-service    PORT=8083 ./bin/mockservice)",
+      "Bash(./bin/gateway -config configs/config.yaml)",
+      "Bash(echo GW_PID=__TRACKED_VAR__)",
+      "Bash(curl -s http://localhost:8080/health)",
+      "Bash(curl -s -w \" [%{http_code}]\\\\n\" http://localhost:8080/api/products)",
+      "Bash(./bin/token -role customer -sub user-77)",
+      "Bash(curl -s -w '\\\\n[%{http_code}]\\\\n' -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:8080/api/products/42?x=1)",
+      "Bash(curl -s -w ' [%{http_code}]\\\\n' -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:8080/api/admin/x)"
+    ]
+  }
+}

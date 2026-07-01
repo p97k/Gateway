@@ -1,0 +1,12 @@
+bin/
+*.out
+cover.out
+coverage.html
+.git/
+.gitignore
+.idea/
+.vscode/
+*.md
+docs/
+deployments/grafana/
+README*.md

@@ -1,0 +1,82 @@
+# docker-compose for the full gateway stack:
+#   gateway + 3 mock backends + Prometheus + Grafana
+#
+#   docker compose up --build
+#
+# Then (from the host, with Go installed):
+#   TOKEN=$(go run ./cmd/token -role customer)
+#   curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/products
+#   open http://localhost:9090   (Prometheus)
+#   open http://localhost:3000   (Grafana, admin/admin)
+
+services:
+  gateway:
+    build: .
+    image: apigateway:latest
+    command: ["-config", "/app/configs/config.docker.yaml"]
+    ports:
+      - "8080:8080"
+    environment:
+      GATEWAY_JWT_SECRET: secret123
+    depends_on:
+      - product-service
+      - order-service
+      - user-service
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  product-service:
+    image: apigateway:latest
+    build: .
+    entrypoint: ["/app/mockservice"]
+    environment:
+      SERVICE_NAME: product-service
+      PORT: "8081"
+    expose:
+      - "8081"
+
+  order-service:
+    image: apigateway:latest
+    build: .
+    entrypoint: ["/app/mockservice"]
+    environment:
+      SERVICE_NAME: order-service
+      PORT: "8082"
+    expose:
+      - "8082"
+
+  user-service:
+    image: apigateway:latest
+    build: .
+    entrypoint: ["/app/mockservice"]
+    environment:
+      SERVICE_NAME: user-service
+      PORT: "8083"
+    expose:
+      - "8083"
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - gateway
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./deployments/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus

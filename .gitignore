@@ -1,0 +1,15 @@
+# Binaries & build output
+/bin/
+*.exe
+*.out
+cover.out
+coverage.html
+
+# Local env / secrets
+.env
+*.local.yaml
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

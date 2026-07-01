@@ -1,0 +1,79 @@
+# API Gateway configuration (local / non-Docker defaults).
+#
+# Every value here can be overridden by an environment variable prefixed with
+# GATEWAY_ (dots become underscores), e.g. GATEWAY_SERVER_PORT=9090 or
+# GATEWAY_JWT_SECRET=... — keep real secrets out of this file in production.
+
+server:
+  port: 8080
+  read_timeout: 15s
+  write_timeout: 30s
+  idle_timeout: 60s
+  shutdown_timeout: 10s
+
+jwt:
+  algorithm: HS256          # HS256 today; RS256 supported by setting public_key
+  secret: "secret123"       # demo only — inject via GATEWAY_JWT_SECRET in prod
+  issuer: "auth-service"
+  audience: "api"
+
+# Routing rules. Longest matching prefix wins (ordering in this file does not
+# matter — routes are sorted by prefix length at load time).
+routes:
+  - prefix: /api/products
+    service: product-service
+    auth: true                # require a valid JWT
+    # no roles => any authenticated user may access
+
+  - prefix: /api/orders
+    service: order-service
+    auth: true
+    roles: [customer, admin]  # only these roles may access
+
+  - prefix: /api/users
+    service: user-service
+    auth: true
+
+  - prefix: /api/admin
+    service: user-service
+    auth: true
+    roles: [admin]            # admin-only area
+
+# Logical service name -> upstream base URL. Swap NewStatic for a dynamic
+# registry (Consul/K8s) without touching routing.
+services:
+  product-service:
+    url: http://localhost:8081
+  order-service:
+    url: http://localhost:8082
+  user-service:
+    url: http://localhost:8083
+
+# Token-bucket rate limiting. Each enabled scope must pass.
+rate_limit:
+  global:
+    enabled: true
+    rps: 1000      # sustained requests/second across the whole gateway
+    burst: 2000
+  per_ip:
+    enabled: true
+    rps: 50
+    burst: 100
+  per_user:
+    enabled: true
+    rps: 20
+    burst: 40
+
+logging:
+  level: info      # debug|info|warn|error
+  format: json     # json|console
+
+tracing:
+  enabled: true
+  service_name: api-gateway
+  endpoint: ""           # empty = create spans but don't export; set host:port for OTLP/HTTP
+  sampler_ratio: 1.0
+
+metrics:
+  enabled: true
+  path: /metrics

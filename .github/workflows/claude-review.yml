@@ -1,0 +1,84 @@
+name: Claude PR Review
+
+# Automatically review every pull request that targets a protected branch.
+# Also re-runs when new commits are pushed to an open PR.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, master, develop]
+
+# Cancel an in-flight review if the PR gets new commits before it finishes.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write   # post the review as PR comments
+  issues: write
+
+jobs:
+  review:
+    # Skip drafts; skip PRs opened by bots to avoid loops.
+    if: github.event.pull_request.draft == false && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout PR (full history for diff/merge analysis)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Give Claude ground-truth signals to reason about, not just the diff.
+      - name: Build & vet (non-blocking, output feeds the review)
+        id: checks
+        continue-on-error: true
+        run: |
+          {
+            echo "### go build"
+            go build ./... 2>&1 || echo "BUILD FAILED"
+            echo "### go vet"
+            go vet ./... 2>&1 || echo "VET REPORTED ISSUES"
+          } > /tmp/go-checks.txt
+          cat /tmp/go-checks.txt
+
+      - name: Claude review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Runs headlessly with this prompt; no @claude mention required.
+          prompt: |
+            You are reviewing pull request #${{ github.event.pull_request.number }}
+            ("${{ github.event.pull_request.title }}") for a Go API Gateway that sits
+            at the network edge (auth, authz, routing, reverse proxy, rate limiting).
+
+            Review ONLY the changes in this PR's diff. Use `gh pr diff ${{ github.event.pull_request.number }}`
+            to get the diff and `gh pr view` for context. Local build/vet output is at
+            /tmp/go-checks.txt — factor it in.
+
+            Focus, in priority order:
+            1. CORRECTNESS — logic errors, unhandled errors, nil derefs, race conditions
+               and goroutine/context misuse, off-by-one, incorrect edge-case handling.
+            2. SECURITY — this is an internet-facing gateway. Auth/authz bypasses,
+               injection, SSRF in the reverse proxy, header/trust-boundary mistakes,
+               leaked secrets, unsafe input handling, missing rate-limit enforcement.
+            3. MERGE SAFETY — breaking API/config changes, botched conflict resolution,
+               behavior changes to middleware ordering, backward-incompatible routing.
+            4. STYLE & SIMPLICITY — non-idiomatic Go, duplication, dead code, needless
+               complexity. Keep these brief and clearly lower priority.
+
+            Post findings as inline review comments on the exact lines using `gh`.
+            For each: state severity (blocker/high/medium/nit), the concrete problem,
+            and a suggested fix. If you find nothing material, say so in one summary
+            comment. Do not nitpick formatting that gofmt/linters already handle.
+            Be specific and terse. No praise, no restating the diff.
+          claude_args: |
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh api:*),Bash(go build:*),Bash(go vet:*),Bash(go test:*),Read,Grep,Glob"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
